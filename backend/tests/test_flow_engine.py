@@ -13,6 +13,7 @@ from app.models.booking import Booking, BookingStatus, PaymentState, StepKey
 from app.models.booking_configuration import (
     AgendaVisibility,
     ApprovalMode,
+    LawyerSelectionMode,
     PaymentMode,
     TriageMode,
 )
@@ -20,7 +21,9 @@ from app.services.booking.flow import BookingFlowEngine, describe_flow, resolve_
 from app.services.booking.steps import Actor
 
 
-def make_booking(triage, agenda, approval, payment) -> Booking:
+def make_booking(
+    triage, agenda, approval, payment, lawyer=LawyerSelectionMode.NONE
+) -> Booking:
     return Booking(
         provider_user_id=1,
         client_user_id=2,
@@ -28,6 +31,7 @@ def make_booking(triage, agenda, approval, payment) -> Booking:
         agenda_visibility=agenda,
         approval_mode=approval,
         payment_mode=payment,
+        lawyer_selection_mode=lawyer,
     )
 
 
@@ -88,6 +92,46 @@ def test_request_without_public_agenda(engine):
     assert b.status == BookingStatus.AWAITING_APPROVAL
     engine.advance(b, "approve")
     assert b.status == BookingStatus.CONFIRMED
+
+
+# --- Lawyer selection (firm bookings) -----------------------------------
+def test_lawyer_step_when_client_chooses(engine):
+    b = make_booking(
+        TriageMode.DISABLED,
+        AgendaVisibility.IMMEDIATE,
+        ApprovalMode.AUTOMATIC,
+        PaymentMode.NONE,
+        lawyer=LawyerSelectionMode.CLIENT_CHOOSES,
+    )
+    assert keys(b) == ["lawyer", "agenda"]
+    engine.start(b)
+    assert b.current_step == StepKey.LAWYER
+    engine.advance(b, "select_lawyer")
+    assert b.current_step == StepKey.AGENDA
+    engine.advance(b, "select_slot")
+    assert b.status == BookingStatus.CONFIRMED
+
+
+def test_lawyer_step_required_flag(engine):
+    client_b = make_booking(
+        TriageMode.DISABLED, AgendaVisibility.IMMEDIATE, ApprovalMode.AUTOMATIC,
+        PaymentMode.NONE, lawyer=LawyerSelectionMode.CLIENT_CHOOSES,
+    )
+    hybrid_b = make_booking(
+        TriageMode.DISABLED, AgendaVisibility.IMMEDIATE, ApprovalMode.AUTOMATIC,
+        PaymentMode.NONE, lawyer=LawyerSelectionMode.HYBRID,
+    )
+    assert describe_flow(client_b)[0]["required"] is True
+    assert describe_flow(hybrid_b)[0]["required"] is False
+
+
+def test_no_lawyer_step_for_firm_chooses_or_none(engine):
+    for mode in (LawyerSelectionMode.NONE, LawyerSelectionMode.FIRM_CHOOSES):
+        b = make_booking(
+            TriageMode.DISABLED, AgendaVisibility.IMMEDIATE, ApprovalMode.AUTOMATIC,
+            PaymentMode.NONE, lawyer=mode,
+        )
+        assert keys(b) == ["agenda"]
 
 
 # --- Payment placement --------------------------------------------------

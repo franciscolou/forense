@@ -17,6 +17,7 @@ from dataclasses import dataclass
 from app.models.booking import Booking, BookingStatus, PaymentState, StepKey
 
 # Action names a client/provider sends to complete the corresponding step.
+ACTION_SELECT_LAWYER = "select_lawyer"
 ACTION_SUBMIT_TRIAGE = "submit_triage"
 ACTION_SELECT_SLOT = "select_slot"
 ACTION_APPROVE = "approve"
@@ -52,6 +53,15 @@ class Step:
 
 
 @dataclass(frozen=True)
+class LawyerSelectionStep(Step):
+    # ``required`` is False in HYBRID mode (the client may defer to the firm).
+    required: bool = True
+
+    def describe(self) -> dict:
+        return {**super().describe(), "required": self.required}
+
+
+@dataclass(frozen=True)
 class TriageStep(Step):
     required: bool = True
 
@@ -83,6 +93,17 @@ class PaymentStep(Step):
 
 
 # --- Factories with the canonical metadata for each step ----------------
+def make_lawyer_step(*, required: bool) -> LawyerSelectionStep:
+    return LawyerSelectionStep(
+        key=StepKey.LAWYER,
+        actor=Actor.CLIENT,
+        action=ACTION_SELECT_LAWYER,
+        status_while_waiting=BookingStatus.PENDING,
+        label="Escolha do advogado",
+        required=required,
+    )
+
+
 def make_triage_step(*, required: bool) -> TriageStep:
     return TriageStep(
         key=StepKey.TRIAGE,

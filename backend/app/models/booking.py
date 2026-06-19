@@ -20,6 +20,7 @@ from app.core.database import Base
 from app.models.booking_configuration import (
     AgendaVisibility,
     ApprovalMode,
+    LawyerSelectionMode,
     PaymentMode,
     TriageMode,
 )
@@ -53,6 +54,7 @@ class StepKey(str, enum.Enum):
     waiting on triage vs. slot selection vs. payment).
     """
 
+    LAWYER = "lawyer"
     TRIAGE = "triage"
     AGENDA = "agenda"
     APPROVAL = "approval"
@@ -82,8 +84,20 @@ class Booking(Base, TimestampMixin):
     )
     approval_mode: Mapped[ApprovalMode] = mapped_column(SAEnum(ApprovalMode), nullable=False)
     payment_mode: Mapped[PaymentMode] = mapped_column(SAEnum(PaymentMode), nullable=False)
+    lawyer_selection_mode: Mapped[LawyerSelectionMode] = mapped_column(
+        SAEnum(LawyerSelectionMode),
+        default=LawyerSelectionMode.NONE,
+        server_default=LawyerSelectionMode.NONE.value,
+        nullable=False,
+    )
 
     # --- Outcomes of the steps ------------------------------------------
+    # The responsible lawyer: set by the client (lawyer-selection step) or by the
+    # firm (assignment). Null for direct lawyer bookings and not-yet-assigned
+    # firm bookings.
+    lawyer_user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
+    )
     slot_id: Mapped[int | None] = mapped_column(
         ForeignKey("availability_slots.id", ondelete="SET NULL"), nullable=True
     )
@@ -97,7 +111,14 @@ class Booking(Base, TimestampMixin):
 
     provider: Mapped["User"] = relationship(foreign_keys=[provider_user_id])
     client: Mapped["User"] = relationship(foreign_keys=[client_user_id])
+    lawyer: Mapped["User | None"] = relationship(foreign_keys=[lawyer_user_id])
     slot: Mapped["AvailabilitySlot | None"] = relationship(back_populates="booking")
     triage_response: Mapped["TriageResponse | None"] = relationship(
         back_populates="booking", cascade="all, delete-orphan", uselist=False
     )
+
+    @property
+    def scheduling_user_id(self) -> int:
+        """Whose availability the agenda/slot runs against: the chosen lawyer if
+        any, otherwise the provider (firm or directly-booked lawyer)."""
+        return self.lawyer_user_id or self.provider_user_id

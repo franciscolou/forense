@@ -55,7 +55,7 @@ export default function SearchPage() {
     <>
       <section className="hero">
         <div className="container">
-          <h1>Encontre o advogado ou escritório certo</h1>
+          <h1>Facilite o Direito para o seu caso</h1>
           <p>Busque por área de atuação, nome ou cidade.</p>
         </div>
       </section>

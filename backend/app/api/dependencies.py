@@ -225,6 +225,7 @@ def get_booking_service(
     availability_service: AvailabilityServiceDep,
     questions: TriageQuestionRepoDep,
     users: UserRepoDep,
+    firms: FirmRepoDep,
     config_service: BookingConfigurationServiceDep,
     engine: Annotated[BookingFlowEngine, Depends(get_booking_flow_engine)],
 ) -> BookingService:
@@ -235,6 +236,7 @@ def get_booking_service(
         availability_service=availability_service,
         questions=questions,
         users=users,
+        firms=firms,
         config_service=config_service,
         engine=engine,
     )

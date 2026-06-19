@@ -4,6 +4,7 @@ import {
   getOpenSlots,
   getPublicFlow,
   initiateBooking,
+  selectLawyer,
   selectSlot,
   submitPayment,
   submitTriage,
@@ -81,6 +82,7 @@ export default function BookingFlow({ providerUserId }: { providerUserId: number
     return (
       <div className="section">
         <h2>Agendamento</h2>
+        <LawyerModeNote mode={flow.config.lawyer_selection_mode} />
         <FlowPreview flow={flow} />
         <button className="btn" onClick={start} disabled={busy}>
           {flow.config.agenda_visibility === "hidden"
@@ -114,6 +116,22 @@ export default function BookingFlow({ providerUserId }: { providerUserId: number
         <TerminalPanel booking={booking} />
       )}
     </div>
+  );
+}
+
+const LAWYER_MODE_NOTE: Record<string, string> = {
+  client_chooses: "Você escolhe o advogado que vai atendê-lo.",
+  firm_chooses: "O escritório designa o advogado responsável pelo seu atendimento.",
+  hybrid: "Você pode escolher um advogado ou deixar que o escritório designe um.",
+};
+
+function LawyerModeNote({ mode }: { mode: string }) {
+  const note = LAWYER_MODE_NOTE[mode];
+  if (!note) return null;
+  return (
+    <p className="muted" style={{ marginTop: 0 }}>
+      <strong>Advogado:</strong> {note}
+    </p>
   );
 }
 
@@ -177,6 +195,8 @@ function StepInput({
   onUpdated: (b: Booking) => void;
   setError: (s: string) => void;
 }) {
+  if (stepKey === "lawyer")
+    return <LawyerStep flow={flow} booking={booking} onUpdated={onUpdated} setError={setError} />;
   if (stepKey === "triage")
     return <TriageStep flow={flow} booking={booking} onUpdated={onUpdated} setError={setError} />;
   if (stepKey === "agenda")
@@ -184,6 +204,72 @@ function StepInput({
   if (stepKey === "payment")
     return <PaymentStep booking={booking} onUpdated={onUpdated} setError={setError} />;
   return <p className="muted">Etapa não reconhecida: {stepKey}</p>;
+}
+
+function LawyerStep({
+  flow,
+  booking,
+  onUpdated,
+  setError,
+}: {
+  flow: PublicFlow;
+  booking: Booking;
+  onUpdated: (b: Booking) => void;
+  setError: (s: string) => void;
+}) {
+  // HYBRID lets the client defer to the firm; CLIENT_CHOOSES requires a pick.
+  const optional = booking.pending_action?.required === false;
+  // `null` = no selection yet; "" sentinel = explicit "no preference".
+  const [choice, setChoice] = useState<string>("");
+  const [busy, setBusy] = useState(false);
+
+  const submit = async () => {
+    if (choice === "") {
+      setError("Selecione um advogado.");
+      return;
+    }
+    setBusy(true);
+    setError("");
+    try {
+      const lawyerUserId = choice === "defer" ? null : Number(choice);
+      onUpdated(await selectLawyer(booking.id, lawyerUserId));
+    } catch (e) {
+      setError(errorMessage(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div>
+      <p className="muted">Escolha o advogado que deseja atender você:</p>
+      {flow.lawyers.map((l) => (
+        <label className="field" key={l.user_id} style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <input
+            type="radio"
+            name="lawyer"
+            checked={choice === String(l.user_id)}
+            onChange={() => setChoice(String(l.user_id))}
+          />
+          {l.full_name}
+        </label>
+      ))}
+      {optional && (
+        <label className="field" style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <input
+            type="radio"
+            name="lawyer"
+            checked={choice === "defer"}
+            onChange={() => setChoice("defer")}
+          />
+          Sem preferência (o escritório escolhe)
+        </label>
+      )}
+      <button className="btn" onClick={submit} disabled={busy || choice === ""}>
+        Continuar
+      </button>
+    </div>
+  );
 }
 
 function TriageStep({
@@ -288,11 +374,13 @@ function AgendaStep({
   const [weekIndex, setWeekIndex] = useState(0);
 
   useEffect(() => {
-    getOpenSlots(booking.provider.id)
+    // Slots belong to whoever owns the schedule: the chosen lawyer if any,
+    // otherwise the provider (firm/lawyer).
+    getOpenSlots(booking.scheduling_user_id)
       .then(setSlots)
       .catch((e) => setError(errorMessage(e)))
       .finally(() => setLoaded(true));
-  }, [booking.provider.id, setError]);
+  }, [booking.scheduling_user_id, setError]);
 
   const pick = async (startAt: string) => {
     setBusy(true);

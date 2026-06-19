@@ -5,6 +5,7 @@ from sqlalchemy.orm import selectinload
 
 from app.models.booking import Booking
 from app.models.triage import TriageResponse
+from app.models.user import User
 from app.repositories.base import BaseRepository
 
 
@@ -13,7 +14,11 @@ class BookingRepository(BaseRepository[Booking]):
 
     _LOADS = (
         selectinload(Booking.provider),
-        selectinload(Booking.client),
+        # Eager-load the client's profile too, so the provider can see contact
+        # details without triggering a lazy load on the async session.
+        selectinload(Booking.client).selectinload(User.client),
+        # The responsible lawyer (when chosen/assigned), for display.
+        selectinload(Booking.lawyer),
         selectinload(Booking.slot),
         selectinload(Booking.triage_response).selectinload(TriageResponse.answers),
     )

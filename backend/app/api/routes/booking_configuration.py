@@ -27,7 +27,7 @@ async def update_configuration(
     provider: ProviderUser,
     service: BookingConfigurationServiceDep,
 ) -> BookingConfigurationRead:
-    config = await service.update(provider.id, payload)
+    config = await service.update(provider.id, payload, provider.role)
     return BookingConfigurationRead.model_validate(config)
 
 

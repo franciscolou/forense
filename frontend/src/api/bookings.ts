@@ -1,5 +1,5 @@
 import { api } from "./client";
-import type { Booking, OpenSlot, PublicFlow } from "../types";
+import type { Booking, LawyerOption, OpenSlot, PublicFlow } from "../types";
 
 export interface TriageAnswerInput {
   question_id: number;
@@ -24,6 +24,31 @@ export async function initiateBooking(
     provider_user_id: providerUserId,
     notes,
   });
+  return data;
+}
+
+export async function selectLawyer(
+  bookingId: number,
+  lawyerUserId: number | null,
+): Promise<Booking> {
+  const { data } = await api.post<Booking>(`/bookings/${bookingId}/lawyer`, {
+    lawyer_user_id: lawyerUserId,
+  });
+  return data;
+}
+
+export async function assignLawyer(
+  bookingId: number,
+  lawyerUserId: number,
+): Promise<Booking> {
+  const { data } = await api.post<Booking>(`/bookings/${bookingId}/assign-lawyer`, {
+    lawyer_user_id: lawyerUserId,
+  });
+  return data;
+}
+
+export async function getMyFirmLawyers(): Promise<LawyerOption[]> {
+  const { data } = await api.get<LawyerOption[]>("/me/firm/lawyers");
   return data;
 }
 

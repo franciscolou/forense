@@ -21,6 +21,7 @@ from app.models.booking import Booking, BookingStatus, PaymentState, StepKey
 from app.models.booking_configuration import (
     AgendaVisibility,
     ApprovalMode,
+    LawyerSelectionMode,
     PaymentMode,
     TriageMode,
 )
@@ -29,6 +30,7 @@ from app.services.booking.steps import (
     Step,
     make_agenda_step,
     make_approval_step,
+    make_lawyer_step,
     make_payment_step,
     make_triage_step,
 )
@@ -42,16 +44,27 @@ class BookingConfigLike(Protocol):
     agenda_visibility: AgendaVisibility
     approval_mode: ApprovalMode
     payment_mode: PaymentMode
+    lawyer_selection_mode: LawyerSelectionMode
+
+
+# Lawyer-selection modes that put a client-facing choice step in the pipeline.
+_LAWYER_STEP_MODES = {LawyerSelectionMode.CLIENT_CHOOSES, LawyerSelectionMode.HYBRID}
 
 
 def resolve_steps(config: BookingConfigLike) -> list[Step]:
     """Derive the ordered pipeline from a configuration snapshot.
 
     Canonical order:
-        TRIAGE → AGENDA → APPROVAL → PAYMENT(before)
+        LAWYER → TRIAGE → AGENDA → APPROVAL → PAYMENT(before)
         → [CONFIRMED] → PAYMENT(after)
     """
     steps: list[Step] = []
+    if config.lawyer_selection_mode in _LAWYER_STEP_MODES:
+        steps.append(
+            make_lawyer_step(
+                required=config.lawyer_selection_mode == LawyerSelectionMode.CLIENT_CHOOSES
+            )
+        )
     if config.triage_mode != TriageMode.DISABLED:
         steps.append(make_triage_step(required=config.triage_mode == TriageMode.REQUIRED))
     if config.agenda_visibility != AgendaVisibility.HIDDEN:

@@ -5,6 +5,7 @@ import type {
   AvailabilityException,
   AvailabilityRule,
   BookingConfiguration,
+  LawyerSelectionMode,
   PaymentMode,
   QuestionType,
   Schedule,
@@ -16,6 +17,7 @@ export interface ConfigUpdate {
   agenda_visibility: AgendaVisibility;
   approval_mode: ApprovalMode;
   payment_mode: PaymentMode;
+  lawyer_selection_mode: LawyerSelectionMode;
   min_advance_days: number;
   max_advance_days: number;
 }

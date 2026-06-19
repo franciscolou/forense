@@ -3,17 +3,19 @@ from __future__ import annotations
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.exceptions import NotFoundError
+from app.core.exceptions import NotFoundError, ValidationError
 from app.models.booking_configuration import (
     DEFAULT_MAX_ADVANCE_DAYS,
     DEFAULT_MIN_ADVANCE_DAYS,
     AgendaVisibility,
     ApprovalMode,
     BookingConfiguration,
+    LawyerSelectionMode,
     PaymentMode,
     TriageMode,
 )
 from app.models.triage import TriageQuestion
+from app.models.user import UserRole
 from app.repositories.booking_configuration import BookingConfigurationRepository
 from app.repositories.triage import TriageQuestionRepository
 from app.schemas.booking_configuration import BookingConfigurationUpdate
@@ -29,6 +31,7 @@ def default_configuration(user_id: int) -> BookingConfiguration:
         agenda_visibility=AgendaVisibility.IMMEDIATE,
         approval_mode=ApprovalMode.AUTOMATIC,
         payment_mode=PaymentMode.NONE,
+        lawyer_selection_mode=LawyerSelectionMode.NONE,
         min_advance_days=DEFAULT_MIN_ADVANCE_DAYS,
         max_advance_days=DEFAULT_MAX_ADVANCE_DAYS,
     )
@@ -65,13 +68,20 @@ class BookingConfigurationService:
         return config
 
     async def update(
-        self, user_id: int, data: BookingConfigurationUpdate
+        self, user_id: int, data: BookingConfigurationUpdate, role: UserRole
     ) -> BookingConfiguration:
+        # Lawyer routing only makes sense for firms (which are composed of
+        # lawyers); anyone else stays on NONE.
+        if data.lawyer_selection_mode != LawyerSelectionMode.NONE and role != UserRole.FIRM:
+            raise ValidationError(
+                "A escolha de advogado só está disponível para escritórios"
+            )
         config = await self.get_or_create(user_id)
         config.triage_mode = data.triage_mode
         config.agenda_visibility = data.agenda_visibility
         config.approval_mode = data.approval_mode
         config.payment_mode = data.payment_mode
+        config.lawyer_selection_mode = data.lawyer_selection_mode
         config.min_advance_days = data.min_advance_days
         config.max_advance_days = data.max_advance_days
         await self._session.commit()

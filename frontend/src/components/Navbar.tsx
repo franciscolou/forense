@@ -22,6 +22,7 @@ export default function Navbar() {
           <Link to="/">Buscar</Link>
           {user ? (
             <>
+              {user.role === "client" && <Link to="/agendamentos">Meus agendamentos</Link>}
               {user.role !== "client" && <Link to="/painel">Painel</Link>}
               <span className="muted">{user.full_name}</span>
               <button className="btn-link" onClick={onLogout}>

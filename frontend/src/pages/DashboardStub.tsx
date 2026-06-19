@@ -18,10 +18,14 @@ export default function DashboardStub() {
         por advogados e escritórios.
       </p>
       <p className="muted">
-        Já disponível: configure seu fluxo de agendamento (triagem, agenda, aprovação, pagamento).
+        Já disponível: configure seu fluxo de agendamento (triagem, agenda, aprovação, pagamento) e
+        gerencie as solicitações recebidas.
       </p>
-      <p style={{ display: "flex", gap: 12, justifyContent: "center" }}>
-        <Link to="/painel/agendamento" className="btn">
+      <p style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap" }}>
+        <Link to="/painel/agendamentos" className="btn">
+          Agenda
+        </Link>
+        <Link to="/painel/agendamento" className="btn btn-ghost">
           Configuração de agendamento
         </Link>
         <Link to="/" className="btn btn-ghost">

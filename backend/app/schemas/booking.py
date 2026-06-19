@@ -8,6 +8,7 @@ from app.models.booking import BookingStatus, PaymentState, StepKey
 from app.models.booking_configuration import (
     AgendaVisibility,
     ApprovalMode,
+    LawyerSelectionMode,
     PaymentMode,
     TriageMode,
 )
@@ -20,6 +21,16 @@ class ConfigSnapshot(BaseModel):
     agenda_visibility: AgendaVisibility
     approval_mode: ApprovalMode
     payment_mode: PaymentMode
+    lawyer_selection_mode: LawyerSelectionMode
+
+
+class LawyerOption(BaseModel):
+    """A firm member offered to the client in the lawyer-selection step, or shown
+    as the responsible lawyer in the firm's bookings calendar."""
+
+    user_id: int
+    full_name: str
+    photo_url: str | None = None
 
 
 class StepDescriptor(BaseModel):
@@ -39,6 +50,9 @@ class PublicFlowRead(BaseModel):
     config: ConfigSnapshot
     steps: list[StepDescriptor]
     questions: list[TriageQuestionRead]
+    # Firm members the client can pick from when the lawyer-selection step is
+    # present; empty for non-firm providers.
+    lawyers: list[LawyerOption] = Field(default_factory=list)
 
 
 # --- Action payloads ----------------------------------------------------
@@ -49,6 +63,17 @@ class BookingInitiate(BaseModel):
 
 class TriageSubmit(BaseModel):
     answers: list[TriageAnswerInput] = Field(default_factory=list)
+
+
+class LawyerSelect(BaseModel):
+    # The client picks a firm member by their user id. ``None`` defers the choice
+    # to the firm (only allowed in HYBRID mode).
+    lawyer_user_id: int | None = None
+
+
+class LawyerAssign(BaseModel):
+    # The firm assigns the responsible lawyer to a booking.
+    lawyer_user_id: int
 
 
 class SlotSelect(BaseModel):
@@ -70,6 +95,12 @@ class ResolutionInput(BaseModel):
 class PartyRead(BaseModel):
     id: int
     full_name: str
+    email: str | None = None
+    # Populated for the client party (from their Client profile) so the provider
+    # can see who booked; absent for the provider party.
+    phone: str | None = None
+    city: str | None = None
+    state: str | None = None
 
 
 class BookingRead(BaseModel):
@@ -80,6 +111,11 @@ class BookingRead(BaseModel):
     config: ConfigSnapshot
     provider: PartyRead
     client: PartyRead
+    # The responsible lawyer, when one has been chosen/assigned.
+    lawyer: PartyRead | None = None
+    lawyer_user_id: int | None = None
+    # Whose availability the agenda runs against (lawyer if chosen, else provider).
+    scheduling_user_id: int
     slot: SlotRead | None
     scheduled_at: datetime | None
     payment_state: PaymentState

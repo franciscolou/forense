@@ -29,6 +29,18 @@ class FirmRepository(BaseRepository[Firm]):
         result = await self.session.execute(select(Firm).where(Firm.cnpj == cnpj))
         return result.scalar_one_or_none()
 
+    async def get_by_user_id(self, user_id: int) -> Firm | None:
+        """Resolve a firm from its account ``user_id``, with member lawyers (and
+        their users) eager-loaded — used to list/validate selectable lawyers."""
+        result = await self.session.execute(
+            select(Firm)
+            .where(Firm.user_id == user_id)
+            .options(
+                selectinload(Firm.lawyers).selectinload(Lawyer.user),
+            )
+        )
+        return result.scalar_one_or_none()
+
     def _search_stmt(self, *, practice_area_id: int | None, query: str | None):
         stmt = select(Firm)
         if practice_area_id is not None:

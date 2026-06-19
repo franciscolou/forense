@@ -10,6 +10,7 @@ import RegisterLawyerPage from "./pages/RegisterLawyerPage";
 import RegisterFirmPage from "./pages/RegisterFirmPage";
 import DashboardStub from "./pages/DashboardStub";
 import BookingConfigPage from "./pages/BookingConfigPage";
+import BookingsPage from "./pages/BookingsPage";
 
 export default function App() {
   return (
@@ -29,9 +30,13 @@ export default function App() {
           <Route path="/cadastro/advogado" element={<RegisterLawyerPage />} />
           <Route path="/cadastro/escritorio" element={<RegisterFirmPage />} />
 
-          {/* Lawyer/firm dashboards: only the booking configuration slice is built */}
+          {/* Client bookings */}
+          <Route path="/agendamentos" element={<BookingsPage />} />
+
+          {/* Lawyer/firm dashboards: booking configuration + received bookings */}
           <Route path="/painel" element={<DashboardStub />} />
           <Route path="/painel/agendamento" element={<BookingConfigPage />} />
+          <Route path="/painel/agendamentos" element={<BookingsPage />} />
 
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

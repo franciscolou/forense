@@ -14,16 +14,18 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import (
     AuthorizationError,
+    ConflictError,
     NotFoundError,
     ValidationError,
 )
 from app.models.availability import AvailabilitySlot
 from app.models.booking import Booking, BookingStatus, PaymentState
-from app.models.booking_configuration import TriageMode
+from app.models.booking_configuration import LawyerSelectionMode, TriageMode
 from app.models.triage import TriageAnswer, TriageResponse
 from app.models.user import User, UserRole
 from app.repositories.availability import AvailabilityRepository
 from app.repositories.booking import BookingRepository
+from app.repositories.firm import FirmRepository
 from app.repositories.triage import TriageQuestionRepository
 from app.repositories.user import UserRepository
 from app.schemas.availability import SlotRead
@@ -32,6 +34,7 @@ from app.schemas.booking import (
     BookingInitiate,
     BookingRead,
     ConfigSnapshot,
+    LawyerOption,
     PartyRead,
     PublicFlowRead,
     StepDescriptor,
@@ -41,11 +44,23 @@ from app.schemas.triage import TriageQuestionRead, TriageResponseRead
 from app.services.booking.flow import BookingFlowEngine, describe_flow
 from app.services.booking.steps import (
     ACTION_APPROVE,
+    ACTION_SELECT_LAWYER,
     ACTION_SELECT_SLOT,
     ACTION_SUBMIT_PAYMENT,
     ACTION_SUBMIT_TRIAGE,
     Actor,
 )
+
+# Lawyer-selection modes where the firm is responsible for picking the lawyer, so
+# a responsible lawyer must be assigned before the booking can be completed.
+_FIRM_ASSIGNS_MODES = {LawyerSelectionMode.FIRM_CHOOSES, LawyerSelectionMode.HYBRID}
+
+# Closed states: no further actions (including lawyer assignment) are allowed.
+_TERMINAL_STATUSES = {
+    BookingStatus.REJECTED,
+    BookingStatus.CANCELLED,
+    BookingStatus.COMPLETED,
+}
 from app.services.booking_configuration_service import BookingConfigurationService
 
 _PROVIDER_ROLES = {UserRole.LAWYER, UserRole.FIRM}
@@ -60,6 +75,7 @@ class BookingService:
         availability_service: AvailabilityService,
         questions: TriageQuestionRepository,
         users: UserRepository,
+        firms: FirmRepository,
         config_service: BookingConfigurationService,
         engine: BookingFlowEngine,
     ) -> None:
@@ -69,6 +85,7 @@ class BookingService:
         self._availability_service = availability_service
         self._questions = questions
         self._users = users
+        self._firms = firms
         self._configs = config_service
         self._engine = engine
 
@@ -84,6 +101,7 @@ class BookingService:
             config=ConfigSnapshot.model_validate(config, from_attributes=True),
             steps=[StepDescriptor(**s) for s in steps],
             questions=[TriageQuestionRead.model_validate(q) for q in active_questions],
+            lawyers=await self._firm_member_options(provider),
         )
 
     # -- Initiation ------------------------------------------------------
@@ -105,6 +123,7 @@ class BookingService:
             agenda_visibility=config.agenda_visibility,
             approval_mode=config.approval_mode,
             payment_mode=config.payment_mode,
+            lawyer_selection_mode=config.lawyer_selection_mode,
         )
         self._engine.start(booking)
         self._bookings.add(booking)
@@ -112,6 +131,24 @@ class BookingService:
         return await self._read(booking.id)
 
     # -- Client step actions --------------------------------------------
+    async def select_lawyer(
+        self, client: User, booking_id: int, lawyer_user_id: int | None
+    ) -> BookingRead:
+        booking = await self._get_owned(booking_id, client, Actor.CLIENT)
+        if lawyer_user_id is None:
+            # Deferring to the firm is only allowed in HYBRID mode.
+            if booking.lawyer_selection_mode != LawyerSelectionMode.HYBRID:
+                raise ValidationError("É obrigatório escolher um advogado")
+        else:
+            members = await self._firm_member_user_ids(booking.provider_user_id)
+            if lawyer_user_id not in members:
+                raise ValidationError("Advogado não pertence a este escritório")
+            booking.lawyer_user_id = lawyer_user_id
+        self._engine.advance(booking, ACTION_SELECT_LAWYER)
+        await self._session.commit()
+        await self._refresh_lawyer(booking)
+        return await self._read(booking.id)
+
     async def submit_triage(self, client: User, booking_id: int, data: TriageSubmit) -> BookingRead:
         booking = await self._get_owned(booking_id, client, Actor.CLIENT)
         active = [q for q in (await self._provider_questions(booking)) if q.is_active]
@@ -157,9 +194,11 @@ class BookingService:
         self, client: User, booking_id: int, start_at: datetime
     ) -> BookingRead:
         booking = await self._get_owned(booking_id, client, Actor.CLIENT)
-        # Materialise the chosen derived window; the service validates that the
-        # time is actually available (within rules, not blocked, not taken).
-        slot = await self._availability_service.reserve(booking.provider_user_id, start_at)
+        # Materialise the chosen derived window against whoever owns the schedule
+        # (the chosen lawyer if any, otherwise the provider). The service
+        # validates the time is actually available (within rules, not blocked,
+        # not taken).
+        slot = await self._availability_service.reserve(booking.scheduling_user_id, start_at)
         slot.booking = booking
         booking.slot_id = slot.id
         booking.scheduled_at = slot.start_at
@@ -189,8 +228,47 @@ class BookingService:
         await self._session.commit()
         return await self._read(booking.id)
 
+    async def assign_lawyer(
+        self, provider: User, booking_id: int, lawyer_user_id: int
+    ) -> BookingRead:
+        """Firm assigns the responsible lawyer. The lawyer must be a member and,
+        when the booking already has a time, must be free at that time — in which
+        case the slot is moved from the firm's calendar onto the lawyer's."""
+        booking = await self._get_owned(booking_id, provider, Actor.PROVIDER)
+        if booking.status in _TERMINAL_STATUSES:
+            raise ConflictError(
+                "Não é possível atribuir advogado a um agendamento encerrado"
+            )
+        members = await self._firm_member_user_ids(booking.provider_user_id)
+        if lawyer_user_id not in members:
+            raise ValidationError("Advogado não pertence a este escritório")
+        if lawyer_user_id == booking.lawyer_user_id:
+            return await self._read(booking.id)
+
+        if booking.scheduled_at is not None:
+            # Reserve the lawyer's slot first (raises if they're not free), then
+            # release the previously-held slot so a failed assignment changes
+            # nothing.
+            start_at = booking.scheduled_at
+            new_slot = await self._availability_service.reserve(lawyer_user_id, start_at)
+            await self._release_slot(booking)
+            new_slot.booking = booking
+            booking.slot_id = new_slot.id
+            booking.scheduled_at = new_slot.start_at
+        booking.lawyer_user_id = lawyer_user_id
+        await self._session.commit()
+        await self._refresh_lawyer(booking)
+        return await self._read(booking.id)
+
     async def complete(self, provider: User, booking_id: int) -> BookingRead:
         booking = await self._get_owned(booking_id, provider, Actor.PROVIDER)
+        # When the firm is responsible for choosing the lawyer, one must be
+        # assigned before the appointment can be marked done.
+        if (
+            booking.lawyer_selection_mode in _FIRM_ASSIGNS_MODES
+            and booking.lawyer_user_id is None
+        ):
+            raise ValidationError("Atribua um advogado responsável antes de concluir")
         self._engine.transition(booking, "complete", by=Actor.PROVIDER)
         await self._session.commit()
         return await self._read(booking.id)
@@ -214,6 +292,10 @@ class BookingService:
             bookings = await self._bookings.list_for_provider(user.id)
         return [self._serialize(b) for b in bookings]
 
+    async def list_my_lawyers(self, provider: User) -> list[LawyerOption]:
+        """Member lawyers a firm can assign to a booking (empty for non-firms)."""
+        return await self._firm_member_options(provider)
+
     async def get_booking(self, user: User, booking_id: int) -> BookingRead:
         booking = await self._bookings.get_with_relations(booking_id)
         if booking is None:
@@ -231,6 +313,36 @@ class BookingService:
     async def _provider_questions(self, booking: Booking):
         config = await self._configs.get_or_create(booking.provider_user_id)
         return config.questions
+
+    async def _refresh_lawyer(self, booking: Booking) -> None:
+        """Reload the ``lawyer`` relationship after changing ``lawyer_user_id``.
+
+        With ``expire_on_commit=False`` the already-loaded (now stale) relationship
+        would otherwise survive the re-query — same identity-map caveat as the
+        questionnaire reload in ``BookingConfigurationService``."""
+        await self._session.refresh(booking, attribute_names=["lawyer"])
+
+    async def _firm_member_user_ids(self, firm_user_id: int) -> set[int]:
+        firm = await self._firms.get_by_user_id(firm_user_id)
+        if firm is None:
+            return set()
+        return {lawyer.user_id for lawyer in firm.lawyers}
+
+    async def _firm_member_options(self, provider: User) -> list[LawyerOption]:
+        """The firm's member lawyers as selectable options; empty for non-firms."""
+        if provider.role != UserRole.FIRM:
+            return []
+        firm = await self._firms.get_by_user_id(provider.id)
+        if firm is None:
+            return []
+        return [
+            LawyerOption(
+                user_id=lawyer.user_id,
+                full_name=lawyer.user.full_name,
+                photo_url=lawyer.photo_url,
+            )
+            for lawyer in firm.lawyers
+        ]
 
     async def _get_owned(self, booking_id: int, user: User, expected: Actor) -> Booking:
         booking = await self._bookings.get_with_relations(booking_id)
@@ -262,6 +374,20 @@ class BookingService:
             await self._availability.delete(slot)
 
     @staticmethod
+    def _client_party(client: User) -> PartyRead:
+        """Build the client party with contact details from their profile, so the
+        provider can see who booked."""
+        profile = client.client  # eager-loaded; None for non-client users
+        return PartyRead(
+            id=client.id,
+            full_name=client.full_name,
+            email=client.email,
+            phone=profile.phone if profile else None,
+            city=profile.city if profile else None,
+            state=profile.state if profile else None,
+        )
+
+    @staticmethod
     def _is_blank(value) -> bool:
         return value is None or value == "" or value == []
 
@@ -279,8 +405,23 @@ class BookingService:
             current_step=booking.current_step,
             pending_action=pending,
             config=ConfigSnapshot.model_validate(booking, from_attributes=True),
-            provider=PartyRead(id=booking.provider.id, full_name=booking.provider.full_name),
-            client=PartyRead(id=booking.client.id, full_name=booking.client.full_name),
+            provider=PartyRead(
+                id=booking.provider.id,
+                full_name=booking.provider.full_name,
+                email=booking.provider.email,
+            ),
+            client=self._client_party(booking.client),
+            lawyer=(
+                PartyRead(
+                    id=booking.lawyer.id,
+                    full_name=booking.lawyer.full_name,
+                    email=booking.lawyer.email,
+                )
+                if booking.lawyer
+                else None
+            ),
+            lawyer_user_id=booking.lawyer_user_id,
+            scheduling_user_id=booking.scheduling_user_id,
             slot=SlotRead.model_validate(booking.slot) if booking.slot else None,
             scheduled_at=booking.scheduled_at,
             payment_state=booking.payment_state,

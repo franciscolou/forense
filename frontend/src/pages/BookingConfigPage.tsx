@@ -48,6 +48,7 @@ function toDraft(c: BookingConfiguration): ConfigUpdate {
     agenda_visibility: c.agenda_visibility,
     approval_mode: c.approval_mode,
     payment_mode: c.payment_mode,
+    lawyer_selection_mode: c.lawyer_selection_mode,
     min_advance_days: c.min_advance_days,
     max_advance_days: c.max_advance_days,
   };
@@ -90,6 +91,7 @@ export default function BookingConfigPage() {
     draft.agenda_visibility !== config.agenda_visibility ||
     draft.approval_mode !== config.approval_mode ||
     draft.payment_mode !== config.payment_mode ||
+    draft.lawyer_selection_mode !== config.lawyer_selection_mode ||
     draft.min_advance_days !== config.min_advance_days ||
     draft.max_advance_days !== config.max_advance_days;
 
@@ -174,6 +176,28 @@ export default function BookingConfigPage() {
           ]}
           onChange={(v) => editDraft({ payment_mode: v as ConfigUpdate["payment_mode"] })}
         />
+        {user?.role === "firm" && (
+          <div className="field">
+            <Selector
+              label="Escolha do advogado"
+              value={draft.lawyer_selection_mode}
+              options={[
+                ["none", "Não definir advogado"],
+                ["client_chooses", "Cliente escolhe o advogado"],
+                ["firm_chooses", "Escritório escolhe o advogado"],
+                ["hybrid", "Híbrido (cliente escolhe ou deixa para o escritório)"],
+              ]}
+              onChange={(v) =>
+                editDraft({ lawyer_selection_mode: v as ConfigUpdate["lawyer_selection_mode"] })
+              }
+            />
+            <p className="muted" style={{ margin: "6px 0 0", fontSize: 13 }}>
+              Define quem escolhe o advogado responsável ao agendar. Quando o cliente escolhe, ele
+              agenda na agenda do advogado; sem escolha, agenda na agenda do escritório e você atribui
+              o advogado nos agendamentos recebidos.
+            </p>
+          </div>
+        )}
         <div className="field">
           <label>Antecedência mínima para agendamento</label>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>

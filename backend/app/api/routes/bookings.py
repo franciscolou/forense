@@ -3,10 +3,13 @@ from __future__ import annotations
 
 from fastapi import APIRouter, status
 
-from app.api.dependencies import BookingServiceDep, CurrentUser
+from app.api.dependencies import BookingServiceDep, CurrentUser, ProviderUser
 from app.schemas.booking import (
     BookingInitiate,
     BookingRead,
+    LawyerAssign,
+    LawyerOption,
+    LawyerSelect,
     PaymentSubmit,
     PublicFlowRead,
     ResolutionInput,
@@ -46,6 +49,16 @@ async def initiate_booking(
     return await service.initiate(current_user, payload)
 
 
+@router.post("/bookings/{booking_id}/lawyer", response_model=BookingRead)
+async def select_lawyer(
+    booking_id: int,
+    payload: LawyerSelect,
+    current_user: CurrentUser,
+    service: BookingServiceDep,
+) -> BookingRead:
+    return await service.select_lawyer(current_user, booking_id, payload.lawyer_user_id)
+
+
 @router.post("/bookings/{booking_id}/triage", response_model=BookingRead)
 async def submit_triage(
     booking_id: int,
@@ -77,6 +90,24 @@ async def submit_payment(
 
 
 # --- Provider actions ---------------------------------------------------
+@router.get("/me/firm/lawyers", response_model=list[LawyerOption])
+async def my_firm_lawyers(
+    provider: ProviderUser, service: BookingServiceDep
+) -> list[LawyerOption]:
+    """Member lawyers the firm can assign to a booking."""
+    return await service.list_my_lawyers(provider)
+
+
+@router.post("/bookings/{booking_id}/assign-lawyer", response_model=BookingRead)
+async def assign_lawyer(
+    booking_id: int,
+    payload: LawyerAssign,
+    current_user: CurrentUser,
+    service: BookingServiceDep,
+) -> BookingRead:
+    return await service.assign_lawyer(current_user, booking_id, payload.lawyer_user_id)
+
+
 @router.post("/bookings/{booking_id}/approve", response_model=BookingRead)
 async def approve_booking(
     booking_id: int, current_user: CurrentUser, service: BookingServiceDep

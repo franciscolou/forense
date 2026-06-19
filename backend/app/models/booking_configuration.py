@@ -55,6 +55,21 @@ class PaymentMode(str, enum.Enum):
     AFTER_CONFIRMATION = "after_confirmation"
 
 
+class LawyerSelectionMode(str, enum.Enum):
+    """How the responsible lawyer is chosen on a firm's bookings.
+
+    Only meaningful for ``firm`` providers; lawyers/clients stay ``NONE``.
+    ``NONE`` keeps the legacy behaviour (booking goes to the firm, no lawyer
+    routing). The other modes insert a client-facing "lawyer selection" step
+    and/or require the firm to assign a responsible lawyer.
+    """
+
+    NONE = "none"                    # feature off (legacy behaviour)
+    CLIENT_CHOOSES = "client_chooses"  # client picks the lawyer
+    FIRM_CHOOSES = "firm_chooses"      # firm assigns the lawyer afterwards
+    HYBRID = "hybrid"                  # client may pick, or defer to the firm
+
+
 class BookingConfiguration(Base, TimestampMixin):
     __tablename__ = "booking_configurations"
 
@@ -74,6 +89,13 @@ class BookingConfiguration(Base, TimestampMixin):
     )
     payment_mode: Mapped[PaymentMode] = mapped_column(
         SAEnum(PaymentMode), default=PaymentMode.NONE, nullable=False
+    )
+    # Como o advogado responsável é definido (apenas relevante para escritórios).
+    lawyer_selection_mode: Mapped[LawyerSelectionMode] = mapped_column(
+        SAEnum(LawyerSelectionMode),
+        default=LawyerSelectionMode.NONE,
+        server_default=LawyerSelectionMode.NONE.value,
+        nullable=False,
     )
     # Janela de antecedência: agenda aberta de min_advance_days até
     # max_advance_days dias a partir de hoje.

@@ -6,6 +6,7 @@ from app.models.booking_configuration import (
     MAX_ADVANCE_DAYS_LIMIT,
     AgendaVisibility,
     ApprovalMode,
+    LawyerSelectionMode,
     PaymentMode,
     TriageMode,
 )
@@ -18,6 +19,7 @@ class BookingConfigurationUpdate(BaseModel):
     agenda_visibility: AgendaVisibility
     approval_mode: ApprovalMode
     payment_mode: PaymentMode
+    lawyer_selection_mode: LawyerSelectionMode = LawyerSelectionMode.NONE
     min_advance_days: int = Field(ge=0, le=MAX_ADVANCE_DAYS_LIMIT)
     max_advance_days: int = Field(ge=1, le=MAX_ADVANCE_DAYS_LIMIT)
 
@@ -44,6 +46,7 @@ class BookingConfigurationRead(ORMModel):
     agenda_visibility: AgendaVisibility
     approval_mode: ApprovalMode
     payment_mode: PaymentMode
+    lawyer_selection_mode: LawyerSelectionMode
     min_advance_days: int
     max_advance_days: int
     questions: list[TriageQuestionRead]

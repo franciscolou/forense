@@ -7,6 +7,7 @@ export default function ConfirmDialog({
   message,
   confirmLabel = "Confirmar",
   cancelLabel = "Cancelar",
+  busyLabel = "Excluindo...",
   danger = false,
   busy = false,
   onConfirm,
@@ -16,6 +17,7 @@ export default function ConfirmDialog({
   message: React.ReactNode;
   confirmLabel?: string;
   cancelLabel?: string;
+  busyLabel?: string;
   danger?: boolean;
   busy?: boolean;
   onConfirm: () => void;
@@ -50,7 +52,7 @@ export default function ConfirmDialog({
             onClick={onConfirm}
             disabled={busy}
           >
-            {busy ? "Excluindo..." : confirmLabel}
+            {busy ? busyLabel : confirmLabel}
           </button>
         </div>
       </div>

@@ -87,6 +87,11 @@ export type TriageMode = "disabled" | "optional" | "required";
 export type AgendaVisibility = "immediate" | "after_triage" | "hidden";
 export type ApprovalMode = "automatic" | "manual";
 export type PaymentMode = "none" | "before_confirmation" | "after_confirmation";
+export type LawyerSelectionMode =
+  | "none"
+  | "client_chooses"
+  | "firm_chooses"
+  | "hybrid";
 
 export type QuestionType = "text" | "boolean" | "single_choice" | "multi_choice";
 
@@ -105,15 +110,22 @@ export interface ConfigSnapshot {
   agenda_visibility: AgendaVisibility;
   approval_mode: ApprovalMode;
   payment_mode: PaymentMode;
+  lawyer_selection_mode: LawyerSelectionMode;
 }
 
 export interface StepDescriptor {
-  key: "triage" | "agenda" | "approval" | "payment";
+  key: "lawyer" | "triage" | "agenda" | "approval" | "payment";
   actor: "client" | "provider";
   action: string;
   label: string;
   required?: boolean | null;
   after_confirmation?: boolean | null;
+}
+
+export interface LawyerOption {
+  user_id: number;
+  full_name: string;
+  photo_url?: string | null;
 }
 
 export interface PublicFlow {
@@ -122,6 +134,7 @@ export interface PublicFlow {
   config: ConfigSnapshot;
   steps: StepDescriptor[];
   questions: TriageQuestion[];
+  lawyers: LawyerOption[];
 }
 
 export interface BookingConfiguration extends ConfigSnapshot {
@@ -180,14 +193,26 @@ export interface TriageAnswerRead {
   value: unknown;
 }
 
+export interface BookingParty {
+  id: number;
+  full_name: string;
+  email: string | null;
+  phone: string | null;
+  city: string | null;
+  state: string | null;
+}
+
 export interface Booking {
   id: number;
   status: BookingStatus;
   current_step: string | null;
   pending_action: StepDescriptor | null;
   config: ConfigSnapshot;
-  provider: { id: number; full_name: string };
-  client: { id: number; full_name: string };
+  provider: BookingParty;
+  client: BookingParty;
+  lawyer: BookingParty | null;
+  lawyer_user_id: number | null;
+  scheduling_user_id: number;
   slot: Slot | null;
   scheduled_at: string | null;
   payment_state: PaymentState;
