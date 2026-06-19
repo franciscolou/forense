@@ -111,6 +111,20 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); bo
 .detail-header { display: flex; gap: 20px; align-items: center; margin: 24px 0; }
 .detail-header .avatar { width: 80px; height: 80px; font-size: 28px; }
 .section { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; margin-bottom: 16px; box-shadow: var(--shadow); }
+
+/* Bio: an introductory lead, deliberately distinct from the white cards. */
+.bio-panel {
+  border-left: 3px solid var(--accent);
+  padding: 4px 0 4px 18px;
+  margin: 4px 0 24px;
+}
+.bio-panel p {
+  margin: 0;
+  font-size: 17px;
+  line-height: 1.6;
+  color: #3a4661;
+  /* font-style: italic; */
+}
 .section h2 { font-size: 16px; margin: 0 0 12px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--muted); }
 .list-row { padding: 8px 0; border-bottom: 1px solid var(--border); }
 .list-row:last-child { border-bottom: none; }
@@ -137,3 +151,78 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); bo
 .checkbox-pill { display: flex; align-items: center; gap: 6px; border: 1px solid var(--border); border-radius: 999px; padding: 6px 12px; cursor: pointer; font-size: 13px; }
 .checkbox-pill input { width: auto; }
 .checkbox-pill.checked { background: var(--primary); color: #fff; border-color: var(--primary); }
+
+.question-edit { border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; margin: 12px 0; background: #fafbfc; }
+
+/* Icon buttons */
+.btn svg { vertical-align: middle; }
+.btn-icon { display: inline-flex; align-items: center; gap: 6px; }
+.btn-icon-only { padding: 6px; line-height: 0; }
+.btn-danger { color: #b42318; }
+.btn-danger:hover { background: #fdecec; }
+.btn-danger-solid { background: #b42318; color: #fff; }
+.btn-danger-solid:hover { background: #9a1d14; }
+
+/* Modal */
+.modal-overlay {
+  position: fixed; inset: 0; background: rgba(16, 24, 40, 0.5);
+  display: flex; align-items: center; justify-content: center; padding: 20px; z-index: 1000;
+}
+.modal {
+  background: var(--surface); border-radius: var(--radius); box-shadow: 0 12px 32px rgba(16, 24, 40, 0.24);
+  width: 100%; max-width: 420px; padding: 24px;
+}
+.modal-title { margin: 0 0 8px; font-size: 18px; }
+.modal-body { color: var(--muted); font-size: 14px; margin-bottom: 20px; }
+.modal-actions { display: flex; justify-content: flex-end; gap: 8px; }
+
+/* Weekly availability grid */
+.schedule-grid {
+  display: grid;
+  grid-template-columns: 56px repeat(7, 1fr);
+  gap: 2px;
+  user-select: none;
+  max-width: 560px;
+}
+.sg-corner { background: transparent; }
+.sg-head, .sg-hour {
+  border: none; background: transparent; cursor: pointer; color: var(--muted);
+  font-size: 12px; font-weight: 600; padding: 4px 0; text-align: center;
+}
+.sg-head { text-transform: uppercase; letter-spacing: 0.4px; }
+.sg-head:hover, .sg-hour:hover { color: var(--primary); }
+.sg-hour { text-align: right; padding-right: 8px; }
+.sg-cell {
+  height: 22px; border-radius: 4px; background: #eef1f5; cursor: pointer;
+  transition: background 0.08s;
+}
+.sg-cell:hover { background: #dde3ec; }
+.sg-cell.on { background: var(--primary); }
+.sg-cell.on:hover { background: var(--primary-600); }
+
+/* Client agenda — weekly calendar */
+.cal-nav {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; margin-bottom: 12px;
+}
+.cal-range { font-weight: 700; color: var(--text); }
+.cal-week { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+.cal-day {
+  border: 1px solid var(--border); border-radius: 8px; overflow: hidden;
+  display: flex; flex-direction: column; background: var(--surface);
+}
+.cal-day-head {
+  background: #f5f6f8; padding: 6px 2px; text-align: center; font-size: 11px;
+  font-weight: 600; color: var(--muted); text-transform: uppercase;
+  letter-spacing: 0.3px; border-bottom: 1px solid var(--border);
+}
+.cal-day-head .num { display: block; color: var(--text); font-size: 13px; letter-spacing: 0; }
+.cal-slots { display: flex; flex-direction: column; gap: 4px; padding: 6px; min-height: 48px; }
+.cal-slot {
+  border: 1px solid var(--accent); background: #eef3fb; color: var(--primary);
+  border-radius: 6px; padding: 6px 2px; font-size: 13px; font-weight: 600;
+  cursor: pointer; transition: background 0.12s, color 0.12s;
+}
+.cal-slot:hover { background: var(--accent); color: #fff; }
+.cal-slot:disabled { opacity: 0.5; cursor: not-allowed; }
+.cal-empty { color: var(--border); text-align: center; font-size: 13px; padding: 6px 0; }

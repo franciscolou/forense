@@ -90,6 +90,7 @@ class LawyerRead(ORMModel):
     """Detailed lawyer view (profile page)."""
 
     id: int
+    user_id: int
     full_name: str
     email: EmailStr
     oab_uf: str
@@ -109,6 +110,7 @@ class LawyerSummary(ORMModel):
     """Lightweight lawyer view used in search result lists."""
 
     id: int
+    user_id: int
     full_name: str
     oab_uf: str
     oab_number: str

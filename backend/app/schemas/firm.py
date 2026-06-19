@@ -56,6 +56,7 @@ class FirmSummary(ORMModel):
     """Lightweight firm view used in search result lists."""
 
     id: int
+    user_id: int
     legal_name: str
     city: str | None
     state: str | None
@@ -67,6 +68,7 @@ class FirmRead(ORMModel):
     """Detailed firm view (profile page)."""
 
     id: int
+    user_id: int
     legal_name: str
     cnpj: str
     oab_registration: str

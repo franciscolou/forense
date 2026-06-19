@@ -89,6 +89,7 @@ não há configuração de CORS necessária em dev.
 
 | Papel     | Email                              | Senha      |
 | --------- | ---------------------------------- | ---------- |
+| Cliente   | cliente@forense.dev                | senha1234  |
 | Advogada  | ana.advogada@forense.dev           | senha1234  |
 | Advogado  | carlos.tributario@forense.dev      | senha1234  |
 | Escritório| contato@martinssouza.adv.br        | senha1234  |
@@ -108,10 +109,74 @@ não há configuração de CORS necessária em dev.
 | POST   | `/api/v1/auth/login`                  | Login (retorna JWT)                    |
 | GET    | `/api/v1/auth/me`                     | Usuário autenticado                    |
 
+## Agendamento flexível (composição de etapas)
+
+Cada advogado/escritório monta seu **próprio fluxo** combinando quatro
+configurações independentes — não há "modos" fixos no código:
+
+| Configuração          | Opções                                                        |
+| --------------------- | ------------------------------------------------------------- |
+| Triagem               | desabilitada · opcional · obrigatória                         |
+| Exibição da agenda    | imediata · após a triagem · não exibir                        |
+| Aprovação             | automática · manual                                           |
+| Pagamento (modelado)  | não cobrar · antes da confirmação · após a confirmação        |
+
+O **motor de fluxo** ([app/services/booking/flow.py](backend/app/services/booking/flow.py))
+deriva, a partir dessas configurações, um pipeline ordenado de etapas
+(`resolve_steps` — a única fonte da composição/ordem):
+`TRIAGE → AGENDA → APPROVAL → PAYMENT(before) → [CONFIRMED] → PAYMENT(after)`.
+Cada etapa é um `Step` autocontido ([steps.py](backend/app/services/booking/steps.py));
+adicionar uma etapa nova = uma classe `Step` + uma linha no resolvedor. Os
+estados do agendamento (`PENDING`, `AWAITING_APPROVAL`, `CONFIRMED`, `REJECTED`,
+`CANCELLED`, `COMPLETED`) e as transições de ciclo de vida ficam numa tabela
+única. O frontend renderiza o fluxo **dinamicamente** a partir dos descritores
+retornados pela API — sem lógica de "modo" no React.
+
+Endpoints principais:
+
+| Método | Rota                                          | Descrição                                  |
+| ------ | --------------------------------------------- | ------------------------------------------ |
+| GET    | `/api/v1/providers/{user_id}/booking-flow`    | Fluxo resolvido + questionário (público)   |
+| GET    | `/api/v1/providers/{user_id}/slots`           | Horários abertos derivados (público)       |
+| POST   | `/api/v1/bookings`                            | Cliente inicia uma solicitação             |
+| POST   | `/api/v1/bookings/{id}/triage` · `/slot` · `/payment` | Ações do cliente nas etapas        |
+| POST   | `/api/v1/bookings/{id}/approve` · `/reject` · `/complete` | Ações do provider               |
+| POST   | `/api/v1/bookings/{id}/cancel`                | Cancelamento (qualquer parte)              |
+| GET/PUT| `/api/v1/me/booking-configuration`            | Provider configura seu fluxo               |
+| CRUD   | `/api/v1/me/booking-configuration/questions`  | Perguntas de triagem (por provider)        |
+| GET/PUT| `/api/v1/me/availability` · `/rules`          | Provider edita a grade semanal recorrente  |
+| CRUD   | `/api/v1/me/availability/exceptions`          | Bloqueios pontuais (feriados, férias)      |
+
+### Disponibilidade (grade semanal + bloqueios)
+
+A agenda não é cadastrada hora a hora. O provider declara uma **grade semanal
+recorrente** (`AvailabilityRule`: dia da semana + faixa de horas) — pintada numa
+interface visual em [BookingConfigPage](frontend/src/pages/BookingConfigPage.tsx)
+— e **bloqueios pontuais** (`AvailabilityException`: feriados, férias). Os slots
+de uma hora oferecidos ao cliente são **derivados** dessas regras menos os
+bloqueios menos o que já está reservado, para um horizonte rolante
+([availability_service.py](backend/app/services/availability_service.py)); um
+`AvailabilitySlot` só é materializado quando o cliente de fato reserva. Convenção
+de relógio: as horas da grade são tratadas como **UTC** de ponta a ponta.
+
+Os três demos vêm com configurações distintas: Ana (Doctoralia-like), Carlos
+(triagem obrigatória + agenda após triagem + aprovação manual) e o escritório
+(triagem opcional + sem agenda pública + aprovação manual). No frontend, abra o
+perfil de um provider (como cliente) para ver o fluxo, ou
+`/painel/agendamento` (como provider) para configurá-lo.
+
+### Testes
+
+```bash
+cd backend && source .venv/bin/activate
+pip install -r requirements-dev.txt
+pytest          # cobre os 4 fluxos, posicionamento de pagamento, guardas e ciclo de vida
+```
+
 ## Próximos passos
 
 - Validação real da OAB (implementar uma `OABValidator` concreta).
-- Painel do advogado/escritório (edição de perfil, gestão de advogados, leads).
+- Restante do painel do advogado/escritório (gestão de solicitações, leads).
+- Integração real de meios de pagamento (hoje apenas modelado).
 - Migrações com Alembic (substituir o `create_all` de startup).
 - Paginação na UI e ordenação/relevância na busca.
-- Testes (pytest + httpx) — a arquitetura desacoplada já está pronta para mocks.

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { getLawyer } from "../api/directory";
 import { errorMessage } from "../api/client";
+import BookingFlow from "../components/BookingFlow";
 import { Spinner, Tags, initials } from "../components/ui";
 import type { LawyerDetail } from "../types";
 
@@ -42,20 +43,21 @@ export default function LawyerDetailPage() {
               {lawyer.years_of_experience != null && ` · ${lawyer.years_of_experience} anos de atuação`}
             </div>
           )}
+          {lawyer.practice_areas.length > 0 && (
+            <div style={{ marginTop: 10 }}>
+              <Tags areas={lawyer.practice_areas} />
+            </div>
+          )}
         </div>
-      </div>
-
-      <div className="section">
-        <h2>Áreas de atuação</h2>
-        <Tags areas={lawyer.practice_areas} />
       </div>
 
       {lawyer.bio && (
-        <div className="section">
-          <h2>Sobre</h2>
-          <p style={{ margin: 0 }}>{lawyer.bio}</p>
+        <div className="bio-panel">
+          <p>{lawyer.bio}</p>
         </div>
       )}
+
+      <BookingFlow providerUserId={lawyer.user_id} />
 
       {lawyer.educations.length > 0 && (
         <div className="section">

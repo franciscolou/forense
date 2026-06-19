@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { getFirm } from "../api/directory";
 import { errorMessage } from "../api/client";
+import BookingFlow from "../components/BookingFlow";
 import { Spinner, Tags, initials } from "../components/ui";
 import type { FirmDetail } from "../types";
 
@@ -38,20 +39,21 @@ export default function FirmDetailPage() {
               {firm.city}/{firm.state}
             </div>
           )}
+          {firm.practice_areas.length > 0 && (
+            <div style={{ marginTop: 10 }}>
+              <Tags areas={firm.practice_areas} />
+            </div>
+          )}
         </div>
-      </div>
-
-      <div className="section">
-        <h2>Áreas de atuação</h2>
-        <Tags areas={firm.practice_areas} />
       </div>
 
       {firm.description && (
-        <div className="section">
-          <h2>Sobre o escritório</h2>
-          <p style={{ margin: 0 }}>{firm.description}</p>
+        <div className="bio-panel">
+          <p>{firm.description}</p>
         </div>
       )}
+
+      <BookingFlow providerUserId={firm.user_id} />
 
       <div className="section">
         <h2>Advogados ({firm.lawyers.length})</h2>

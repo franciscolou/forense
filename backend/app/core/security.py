@@ -1,6 +1,7 @@
 """Security primitives: password hashing and JWT access tokens."""
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
@@ -8,6 +9,10 @@ from jose import JWTError, jwt
 from passlib.context import CryptContext
 
 from app.core.config import settings
+
+# passlib 1.7.4 probes ``bcrypt.__about__.__version__``, removed in bcrypt 4.x,
+# and logs a (harmless, trapped) warning. Silence it — hashing works fine.
+logging.getLogger("passlib").setLevel(logging.ERROR)
 
 _pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 

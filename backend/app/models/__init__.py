@@ -13,6 +13,25 @@ from app.models.associations import (
     lawyer_practice_areas,
     firm_practice_areas,
 )
+from app.models.booking_configuration import (
+    BookingConfiguration,
+    TriageMode,
+    AgendaVisibility,
+    ApprovalMode,
+    PaymentMode,
+)
+from app.models.triage import (
+    QuestionType,
+    TriageQuestion,
+    TriageResponse,
+    TriageAnswer,
+)
+from app.models.availability import (
+    AvailabilityException,
+    AvailabilityRule,
+    AvailabilitySlot,
+)
+from app.models.booking import Booking, BookingStatus, PaymentState, StepKey
 
 __all__ = [
     "User",
@@ -26,4 +45,20 @@ __all__ = [
     "firm_lawyers",
     "lawyer_practice_areas",
     "firm_practice_areas",
+    "BookingConfiguration",
+    "TriageMode",
+    "AgendaVisibility",
+    "ApprovalMode",
+    "PaymentMode",
+    "QuestionType",
+    "TriageQuestion",
+    "TriageResponse",
+    "TriageAnswer",
+    "AvailabilitySlot",
+    "AvailabilityRule",
+    "AvailabilityException",
+    "Booking",
+    "BookingStatus",
+    "PaymentState",
+    "StepKey",
 ]

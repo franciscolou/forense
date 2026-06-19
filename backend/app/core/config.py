@@ -24,6 +24,9 @@ class Settings(BaseSettings):
     PROJECT_NAME: str = "Forense"
     API_V1_PREFIX: str = "/api/v1"
     DEBUG: bool = True
+    # Echo every SQL statement to the log. Off by default (very noisy); flip to
+    # true via env (SQL_ECHO=1) when debugging queries.
+    SQL_ECHO: bool = False
 
     # --- Database --------------------------------------------------------
     # Defaults to a local async SQLite file so the project runs with zero

@@ -17,8 +17,14 @@ export default function DashboardStub() {
         ainda não foi implementada. Por enquanto, o foco está na visão do cliente — a busca
         por advogados e escritórios.
       </p>
-      <p>
-        <Link to="/" className="btn">
+      <p className="muted">
+        Já disponível: configure seu fluxo de agendamento (triagem, agenda, aprovação, pagamento).
+      </p>
+      <p style={{ display: "flex", gap: 12, justifyContent: "center" }}>
+        <Link to="/painel/agendamento" className="btn">
+          Configuração de agendamento
+        </Link>
+        <Link to="/" className="btn btn-ghost">
           Ir para a busca
         </Link>
       </p>
